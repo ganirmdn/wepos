@@ -198,6 +198,12 @@ function wepos_get_settings_fields() {
                     'custom' => __( 'Custom field', 'wepos' ),
                 ]
             ],
+            'whatsapp_support' => [
+                'name'    => 'whatsapp_support',
+                'label'   => __( 'WA', 'wepos' ),
+                'desc'    => __( 'WA number (e.g. 62812xxxxxx)', 'wepos' ),
+                'type'    => 'number',
+            ]
         ],
         'wepos_receipts' => [
             'receipt_header' => [

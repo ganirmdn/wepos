@@ -225,6 +225,10 @@ class Assets {
             'home_url'                     => home_url()
         ] );
 
+        if ( class_exists( 'WC_Measurement_Price_Calculator' ) ) {
+            $localize_data['wc_price_calculator_enabled'] = true;
+        }
+
         wp_localize_script( 'wepos-vendor', 'wepos', $localize_data );
     }
 

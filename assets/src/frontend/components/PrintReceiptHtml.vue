@@ -9,9 +9,17 @@
         <div class="content">
             <table class="sale-summary">
                 <tbody>
-                    <tr v-for="item in printdata.line_items">
+                    <tr v-for="item, index in printdata.line_items" :key="index">
                         <td class="name">
                             {{ item.name }}
+                            <div class="attribute" v-if="item.measurement_needed_total">
+                                <ul>
+                                    <li v-for="measurement, indexMeta in getMeasurementData( item )" :key="indexMeta">
+                                        <span class="attr_name">{{ measurement.label }} ({{ measurement.unit }}) </span>: <span class="attr_value">{{ measurement.value }}</span>,
+                                    </li>
+                                    <li><span class="attr_name">Total ({{ item.measurement_needed_unit }})</span>: <span class="attr_value">{{ item.measurement_needed_total }}</span></li>
+                                </ul>
+                            </div>
                             <div class="attribute" v-if="item.attribute.length > 0">
                                 <ul>
                                     <li v-for="attribute_item in item.attribute"><span class="attr_name">{{ attribute_item.name }}</span>: <span class="attr_value">{{ attribute_item.option }}</span></li>
@@ -98,10 +106,26 @@ export default {
             }
         }
     },
+
     methods: {
         formatDate( date ) {
             var date = new Date( date );
             return date.toLocaleString();
+        },
+
+        getMeasurementData( cartItem ) {
+            let result = {};
+
+            weLo_.forIn( cartItem, ( item, key ) => {
+                if (
+                    key.includes('measurement_needed_') &&
+                    ! ['measurement_needed_total', 'measurement_needed_unit'].includes(key)
+                ) {
+                    Object.assign( result, { [key]: item } );
+                }
+            } );
+
+            return result;
         }
     }
 };

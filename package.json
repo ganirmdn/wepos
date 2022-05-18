@@ -14,6 +14,7 @@
   "dependencies": {
     "@mathieustan/vue-datepicker": "^0.2.8",
     "@wordpress/hooks": "^2.12.3",
+    "bignumber.js": "^9.0.2",
     "dayjs": "^1.8.36",
     "lodash": "^4.17.21",
     "v-hotkey": "^0.3.0",
