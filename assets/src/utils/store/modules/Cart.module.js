@@ -1,4 +1,5 @@
 import Helper from '../helper';
+import { MEASUREMENT_DIMENSION } from '@/constants';
 
 export default {
     namespaced: true,
@@ -126,6 +127,28 @@ export default {
             cartObject.backorders_allowed = product.backorders_allowed;
             cartObject.stock_quantity     = product.stock_quantity;
 
+            if ( wepos.wc_price_calculator_enabled && product.hasOwnProperty( 'wepos_measurement_price_calculator' ) ) {
+                const measurementPriceCalculator = product.wepos_measurement_price_calculator;
+                const measurementData            = measurementPriceCalculator.measurement_data;
+
+                cartObject.measurement_needed_total = 0;
+                cartObject.measurement_needed_unit  = measurementPriceCalculator.product_price_unit;
+                cartObject.regular_price            = product.sales_display_price;
+
+                weLo_.forIn( measurementData, ( item, key ) => {
+                    if (
+                        key !== 'pricing' &&
+                        ( item.editable === 'yes' || ( this.measurementPriceCalculator.measurement_type === MEASUREMENT_DIMENSION && item.enabled === 'yes' ) )
+                    ) {
+                        cartObject['measurement_needed_' + key] = {
+                            label: item.label,
+                            unit: item.unit,
+                            value: 0
+                        };
+                    }
+                } );
+            }
+
             var index = weLo_.findIndex( state.cartdata.line_items, { product_id: cartObject.product_id, variation_id: cartObject.variation_id} );
 
             if ( index < 0 ) {
@@ -238,8 +261,54 @@ export default {
                 } );
             }
         },
+        setTotalMeasurmentNeeded( state, payload ) {
+            var product = payload.product,
+                measurementValue = parseFloat( payload.value ),
+                key = payload.key;
+
+            if ( ! measurementValue || measurementValue < 0 ) {
+                state.cartdata.line_items[key].measurement_needed_total = 0
+                return;
+            }
+            if ( 'area-linear' === product.measurement_type ) {
+
+                if ( ! state.cartdata.line_items[key].measurement_needed_total ) {
+                    // first or single measurement
+                    state.cartdata.line_items[key].measurement_needed_total = 2 * measurementValue;
+                } else {
+                    // multiply to get either the area or volume measurement
+                    state.cartdata.line_items[key].measurement_needed_total += 2 * measurementValue;
+                }
+
+            } else {
+                if ( ! state.cartdata.line_items[key].measurement_needed_total ) {
+                    // first or single measurement
+                    state.cartdata.line_items[key].measurement_needed_total = measurementValue;
+                } else {
+                    // multiply to get either the area or volume measurement
+                    state.cartdata.line_items[key].measurement_needed_total *= measurementValue;
+                }
+            }
+
+            const totalMeasurement = Helper.convertUnits( state.cartdata.line_items[key].measurement_needed_total, product.product_total_measurement_common_unit, product.product_price_unit, product );
+
+            state.cartdata.line_items[key].measurement_needed_total = totalMeasurement;
+        },
+
+        setCartItem( state, payload ) {
+            state.cartdata.line_items[payload.itemKey][payload.key] = payload.value;
+        }
     },
     actions: {
+
+        setCartItemAction( context, payload ) {
+            context.commit( 'setCartItem', payload );
+        },
+
+        setTotalMeasurmentNeededAction( context, payload ) {
+            context.commit( 'setTotalMeasurmentNeeded', payload );
+        },
+
         setSettingsAction( context, settings ) {
             context.commit( 'setSettings', settings );
         },
