@@ -224,7 +224,9 @@ class Assets {
             'states'                       => WC()->countries->get_states(),
             'current_user_id'              => $current_user->ID,
             'current_user_display_name'    => $current_user->display_name,
-            'home_url'                     => home_url()
+            'home_url'                     => home_url(),
+            'site_name'                    => get_bloginfo( 'name' ),
+            'custom_logo_url'              => esc_url( get_site_icon_url( 64 ) )
         ] );
 
         if ( class_exists( 'WC_Measurement_Price_Calculator' ) ) {
