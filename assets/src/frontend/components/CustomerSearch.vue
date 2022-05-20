@@ -138,7 +138,11 @@
                             <input type="text" :placeholder="__( 'Zip/Postal Code (optional)', 'wepos' )" v-model="customer.postcode">
                         </div>
                         <div class="form-row">
-                            <input type="text" :placeholder="__( 'Phone (optional)', 'wepos' )" v-model="customer.phone">
+                            <input type="text" :placeholder="__( 'Phone (optional), e.g. +6281200000000', 'wepos' )" v-model="customer.phone">
+                        </div>
+                        <div class="wepos-text-alert alert-danger" style="padding: 0 15px" v-if="customer.phone">
+                            <p v-if="!selectedCountry">{{ __( 'Please select a country.', 'wepos' ) }}</p>
+                            <p v-if="!phoneValidation.isValid">{{ __( 'The phone number you entered is not correct.', 'wepos' ) }}</p>
                         </div>
                     </form>
                 </div>
@@ -154,6 +158,7 @@
 <script>
 // import Modal from './Modal.vue';
 import KeyboardControl from './KeyboardControl.vue';
+import {phone} from 'phone';
 let Modal = wepos_get_lib( 'Modal' );
 
 export default {
@@ -207,6 +212,9 @@ export default {
         },
         orderdata() {
             return this.$store.state.Order.orderdata;
+        },
+        phoneValidation() {
+            return phone(this.customer.phone, {country: this.selectedCountry ? this.selectedCountry.code : null});
         }
     },
 
@@ -313,10 +321,15 @@ export default {
                         state: this.selectedState !== null ? this.selectedState.code : this.customer.state,
                         postcode: this.customer.postcode,
                         city: this.customer.city,
-                        phone: this.customer.phone,
+                        phone: this.customer.phone ? this.customer.phone.split('+')[1] : '',
                         email: this.customer.email,
                     }
                 }
+
+                if ( this.customer.phone && ( ! this.phoneValidation.isValid || ! this.selectedCountry ) ) {
+                    return;
+                }
+
                 var $contentWrap = jQuery('.wepos-new-customer-form');
                 $contentWrap.block({ message: null, overlayCSS: { background: '#fff url(' + wepos.ajax_loader + ') no-repeat center', opacity: 0.4 } });
 

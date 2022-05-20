@@ -334,7 +334,13 @@
 
                     <div class="print-section">
                         <print-receipt></print-receipt>
-                        <button v-if="settings.wepos_general.whatsapp_support" @click="sendWa(printdata)" class="send-wa">{{ __( 'WA', 'wepos' ) }}</button>
+                        <button
+                            v-if="settings.wepos_general.whatsapp_support === 'yes' && this.orderdata.billing.phone"
+                            @click="sendWa(printdata)"
+                            class="send-wa"
+                        >
+                            {{ __( 'WA', 'wepos' ) }}
+                        </button>
                         <button class="new-sale-btn" @click.prevent="createNewSale()">
                             <span class="icon flaticon-add"></span>
                             <span class="label">{{ __( 'New Sale', 'wepos' ) }}</span>
@@ -859,6 +865,11 @@ export default {
                                 payment: 'success'
                             }
                         });
+
+                        if ( wepos.wc_points_rewards_enabled ) {
+                            this.getPointsRewards( response.id );
+                        }
+
                         this.printdata = wepos.hooks.applyFilters( 'wepos_after_payment_print_data', {
                             line_items: this.cartdata.line_items,
                             fee_lines: this.cartdata.fee_lines,
@@ -889,7 +900,7 @@ export default {
         },
 
         sendWa( data ) {
-            let text = `https://wa.me/${this.settings.wepos_general.whatsapp_support}?text=`;
+            let text = `https://wa.me/${this.orderdata.billing.phone}?text=`;
             text += `%2A${this.settings.wepos_receipts.receipt_header}%2A%0A%0A`;
 
             text += `%2A${this.__( 'Order ID', 'wepos' )}: ${data.order_id}%2A%0A`;
@@ -1185,6 +1196,12 @@ export default {
             .done( response => {
                 this.taxSettings = response;
             });
+        },
+
+        getPointsRewards( orderId ) {
+            wepos.api.get( wepos.rest.root + wepos.rest.posversion + '/points?id=' + orderId ).done( response => {
+                this.printdata.points = response;
+            } );
         }
     },
 
