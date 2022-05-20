@@ -815,7 +815,7 @@ export default {
 
             this.$store.dispatch( 'Order/setCanProcessPaymentAction', canProcess );
         },
-        processPayment(e) {
+        async processPayment(e) {
             e.preventDefault();
             if ( ! this.$store.getters['Order/getCanProcessPayment'] ) {
                 return;
@@ -853,50 +853,52 @@ export default {
             var $contentWrap = jQuery('.wepos-checkout-wrapper');
             $contentWrap.block({ message: null, overlayCSS: { background: '#fff url(' + wepos.ajax_loader + ') no-repeat center', opacity: 0.4 } });
 
-            wepos.api.post( wepos.rest.root + wepos.rest.wcversion + '/orders', orderdata )
-            .done( response => {
-                wepos.api.post( wepos.rest.root + wepos.rest.posversion + '/payment/process', response )
-                .done( data => {
-                    if ( data.result == 'success' ) {
-                        this.$router.push({
-                            name: 'Home',
-                            query: {
-                                order_key: response.order_key,
-                                payment: 'success'
-                            }
-                        });
-
-                        if ( wepos.wc_points_rewards_enabled ) {
-                            this.getPointsRewards( response.id );
+            try {
+                const orderResponse   = await wepos.api.post( wepos.rest.root + wepos.rest.wcversion + '/orders', orderdata );
+                const paymnetResponse = await wepos.api.post( wepos.rest.root + wepos.rest.posversion + '/payment/process', orderResponse );
+                 if ( paymnetResponse.result === 'success' ) {
+                    this.$router.push({
+                        name: 'Home',
+                        query: {
+                            order_key: orderResponse.order_key,
+                            payment: 'success'
                         }
+                    });
 
-                        this.printdata = wepos.hooks.applyFilters( 'wepos_after_payment_print_data', {
-                            line_items: this.cartdata.line_items,
-                            fee_lines: this.cartdata.fee_lines,
-                            subtotal: this.$store.getters['Cart/getSubtotal'],
-                            taxtotal: this.$store.getters['Cart/getTotalTax'],
-                            ordertotal: this.$store.getters['Cart/getTotal'],
-                            gateway: {
-                                id: response.payment_method,
-                                title: response.payment_method_title
-                            },
-                            order_id: response.id,
-                            order_date: response.date_created,
-                            cashamount: this.cashAmount.toString(),
-                            changeamount: this.changeAmount.toString()
-                        }, orderdata );
-                      $contentWrap.unblock();
-                    } else {
-                        $contentWrap.unblock();
+                    let pointsResponse = null;
+                    if ( wepos.wc_points_rewards_enabled && this.orderdata.customer_id ) {
+                        pointsResponse = await wepos.api.get( wepos.rest.root + wepos.rest.posversion + '/points?id=' + orderResponse.id );
                     }
-                }).fail( data => {
+
+                    this.printdata = wepos.hooks.applyFilters( 'wepos_after_payment_print_data', {
+                        line_items: this.cartdata.line_items,
+                        fee_lines: this.cartdata.fee_lines,
+                        subtotal: this.$store.getters['Cart/getSubtotal'],
+                        taxtotal: this.$store.getters['Cart/getTotalTax'],
+                        ordertotal: this.$store.getters['Cart/getTotal'],
+                        gateway: {
+                            id: orderResponse.payment_method,
+                            title: orderResponse.payment_method_title
+                        },
+                        order_id: orderResponse.id,
+                        order_date: orderResponse.date_created,
+                        cashamount: this.cashAmount.toString(),
+                        changeamount: this.changeAmount.toString(),
+                        customer_id: this.orderdata.customer_id ? this.orderdata.customer_id : null,
+                        billing: this.orderdata.billing ? this.orderdata.billing : null,
+                        points: pointsResponse ? pointsResponse.earned : null,
+                        points_balance: pointsResponse ? pointsResponse.points_balance : null
+                    }, orderdata );
+
                     $contentWrap.unblock();
-                    alert( data.responseJSON.message );
-                });
-            }).fail( response => {
+                } else {
+                    $contentWrap.unblock();
+                }
+            } catch (error) {
+                const message = error.responseJSON ? error.responseJSON.message : 'Error';
                 $contentWrap.unblock();
-                alert( response.responseJSON.message );
-            } );
+                alert( message );
+            }
         },
 
         sendWa( data ) {
@@ -1197,12 +1199,6 @@ export default {
                 this.taxSettings = response;
             });
         },
-
-        getPointsRewards( orderId ) {
-            wepos.api.get( wepos.rest.root + wepos.rest.posversion + '/points?id=' + orderId ).done( response => {
-                this.printdata.points = response;
-            } );
-        }
     },
 
     async created() {

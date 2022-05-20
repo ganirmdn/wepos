@@ -115,7 +115,12 @@ class PointsController extends \WP_REST_Controller {
 
 		$points_earned = WC_Points_Rewards_Manager::round_the_points( $points_earned );
 
-		return rest_ensure_response( $points_earned );
+
+
+		return rest_ensure_response( [
+            'earned'         => $points_earned,
+            'points_balance' => WC_Points_Rewards_Manager::get_users_points( get_current_user_id() )
+        ] );
 	}
 
 }
