@@ -200,9 +200,14 @@ function wepos_get_settings_fields() {
             ],
             'whatsapp_support' => [
                 'name'    => 'whatsapp_support',
-                'label'   => __( 'WA', 'wepos' ),
-                'desc'    => __( 'WA number (e.g. 62812xxxxxx)', 'wepos' ),
-                'type'    => 'number',
+                'label'   => __( 'Enable WA', 'wepos' ),
+                'desc'    => __( 'Whatsapp Support', 'wepos' ),
+                'type'    => 'select',
+                'default' => 'yes',
+                'options' => [
+                    'yes' => __( 'Yes', 'wepos' ),
+                    'no'  => __( 'No', 'wepos' ),
+                ]
             ]
         ],
         'wepos_receipts' => [

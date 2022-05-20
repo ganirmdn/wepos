@@ -194,6 +194,7 @@ class Assets {
      * @return void
      */
     public function register_localize() {
+        $current_user  = wp_get_current_user();
         $localize_data = apply_filters( 'wepos_localize_data', [
             'rest' => array(
                 'root'    => esc_url_raw( get_rest_url() ),
@@ -221,12 +222,17 @@ class Assets {
             'categories'                   => wepos_get_product_category(),
             'countries'                    => WC()->countries->get_countries(),
             'states'                       => WC()->countries->get_states(),
-            'current_user_id'              => get_current_user_id(),
+            'current_user_id'              => $current_user->ID,
+            'current_user_display_name'    => $current_user->display_name,
             'home_url'                     => home_url()
         ] );
 
         if ( class_exists( 'WC_Measurement_Price_Calculator' ) ) {
             $localize_data['wc_price_calculator_enabled'] = true;
+        }
+
+        if ( class_exists( 'WC_Points_Rewards' ) ) {
+            $localize_data['wc_points_rewards_enabled'] = true;
         }
 
         wp_localize_script( 'wepos-vendor', 'wepos', $localize_data );
