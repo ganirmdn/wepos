@@ -216,16 +216,26 @@
                                             <span class="flaticon-cancel-music" @click.prevent="removeItem(key)"></span>
                                         </td>
                                     </tr>
-                                    <tr v-if="item.editQuantity" class="update-quantity-wrap">
-                                        <td colspan="5">
-                                            <span class="qty">{{ __( 'Quantity', 'wepos' ) }}</span>
-                                            <span class="qty-number"><input type="number" min="1" step="1" v-model="item.quantity"></span>
-                                            <span class="qty-action">
-                                                <a href="#" class="add" @click.prevent="addQuantity( item, key )">&#43;</a>
-                                                <a href="#" class="minus" @click.prevent="removeQuantity( item, key )">&#45;</a>
-                                            </span>
-                                        </td>
-                                    </tr>
+                                    <template v-if="item.editQuantity">
+                                        <tr class="update-quantity-wrap">
+                                            <td colspan="5">
+                                                <span class="qty">{{ __( 'Quantity', 'wepos' ) }}</span>
+                                                <span class="qty-number"><input type="number" min="1" step="1" v-model="item.quantity"></span>
+                                                <span class="qty-action">
+                                                    <a href="#" class="add" @click.prevent="addQuantity( item, key )">&#43;</a>
+                                                    <a href="#" class="minus" @click.prevent="removeQuantity( item, key )">&#45;</a>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr class="measurement-calculator-wrap" v-if="isMeasurementCalculator( getProduct( item.product_id ) )">
+                                            <td colspan="5">
+                                                <CalculatorInput
+                                                    :products="products"
+                                                    :cartItemKey="key"
+                                                />
+                                            </td>
+                                        </tr>
+                                    </template>
                                 </template>
                             </template>
                             <template v-else>
@@ -324,6 +334,13 @@
 
                     <div class="print-section">
                         <print-receipt></print-receipt>
+                        <button
+                            v-if="settings.wepos_general.whatsapp_support === 'yes' && this.orderdata.billing.phone"
+                            @click="sendWa(printdata)"
+                            class="send-wa"
+                        >
+                            {{ __( 'WA', 'wepos' ) }}
+                        </button>
                         <button class="new-sale-btn" @click.prevent="createNewSale()">
                             <span class="icon flaticon-add"></span>
                             <span class="label">{{ __( 'New Sale', 'wepos' ) }}</span>
@@ -552,14 +569,15 @@
 
 <script>
 
-import Overlay from './Overlay.vue';
-import ProductSearch from './ProductSearch.vue';
+import CalculatorInput from './measurement-calculator/CalculatorInput.vue';
+import CustomerNote from './CustomerNote.vue';
 import CustomerSearch from './CustomerSearch.vue';
 import FeeKeypad from './FeeKeypad.vue';
 import MugenScroll from 'vue-mugen-scroll';
+import Overlay from './Overlay.vue';
 import PrintReceipt from './PrintReceipt.vue';
 import PrintReceiptHtml from './PrintReceiptHtml.vue';
-import CustomerNote from './CustomerNote.vue';
+import ProductSearch from './ProductSearch.vue';
 
 let Modal = wepos_get_lib( 'Modal' );
 
@@ -568,15 +586,16 @@ export default {
     name: 'Home',
 
     components : {
-        ProductSearch,
+        CalculatorInput,
+        CustomerNote,
         CustomerSearch,
-        Overlay,
+        FeeKeypad,
         Modal,
         MugenScroll,
-        FeeKeypad,
+        Overlay,
         PrintReceipt,
         PrintReceiptHtml,
-        CustomerNote
+        ProductSearch,
     },
 
     data () {
@@ -718,6 +737,21 @@ export default {
     },
 
     methods: {
+        getProduct( productId ) {
+            const product = this.products.filter( item => {
+                return item.id === productId
+            } );
+
+            return product.hasOwnProperty( 0 ) ? product[ 0 ] : false;
+        },
+
+        isMeasurementCalculator( product ) {
+            if ( ! product ) {
+                return;
+            }
+            return wepos.wc_price_calculator_enabled && product.hasOwnProperty( 'wepos_measurement_price_calculator' );
+        },
+
         openQucikMenu() {
             this.showQucikMenu = true;
         },
@@ -781,10 +815,15 @@ export default {
 
             this.$store.dispatch( 'Order/setCanProcessPaymentAction', canProcess );
         },
-        processPayment(e) {
+
+        async processPayment(e) {
+            e.preventDefault();
             if ( ! this.$store.getters['Order/getCanProcessPayment'] ) {
                 return;
             }
+
+            wepos.hooks.doAction( 'wepos_before_create_order' );
+
             var self = this,
                 gateway = weLo_.find( this.availableGateways, { 'id' : this.orderdata.payment_method } ),
                 orderdata = wepos.hooks.applyFilters( 'wepos_order_form_data', {
@@ -815,45 +854,112 @@ export default {
             var $contentWrap = jQuery('.wepos-checkout-wrapper');
             $contentWrap.block({ message: null, overlayCSS: { background: '#fff url(' + wepos.ajax_loader + ') no-repeat center', opacity: 0.4 } });
 
-            wepos.api.post( wepos.rest.root + wepos.rest.wcversion + '/orders', orderdata )
-            .done( response => {
-                wepos.api.post( wepos.rest.root + wepos.rest.posversion + '/payment/process', response )
-                .done( data => {
-                    if ( data.result == 'success' ) {
-                        this.$router.push({
-                            name: 'Home',
-                            query: {
-                                order_key: response.order_key,
-                                payment: 'success'
-                            }
-                        });
-                        this.printdata = wepos.hooks.applyFilters( 'wepos_after_payment_print_data', {
-                            line_items: this.cartdata.line_items,
-                            fee_lines: this.cartdata.fee_lines,
-                            subtotal: this.$store.getters['Cart/getSubtotal'],
-                            taxtotal: this.$store.getters['Cart/getTotalTax'],
-                            ordertotal: this.$store.getters['Cart/getTotal'],
-                            gateway: {
-                                id: response.payment_method,
-                                title: response.payment_method_title
-                            },
-                            order_id: response.id,
-                            order_date: response.date_created,
-                            cashamount: this.cashAmount.toString(),
-                            changeamount: this.changeAmount.toString()
-                        }, orderdata );
-                      $contentWrap.unblock();
-                    } else {
-                        $contentWrap.unblock();
+            try {
+                const orderResponse   = await wepos.api.post( wepos.rest.root + wepos.rest.wcversion + '/orders', orderdata );
+                const paymnetResponse = await wepos.api.post( wepos.rest.root + wepos.rest.posversion + '/payment/process', orderResponse );
+                 if ( paymnetResponse.result === 'success' ) {
+                    this.$router.push({
+                        name: 'Home',
+                        query: {
+                            order_key: orderResponse.order_key,
+                            payment: 'success'
+                        }
+                    });
+
+                    let pointsResponse = null;
+                    if ( wepos.wc_points_rewards_enabled && this.orderdata.customer_id ) {
+                        pointsResponse = await wepos.api.get( wepos.rest.root + wepos.rest.posversion + '/points?id=' + orderResponse.id );
                     }
-                }).fail( data => {
+
+                    this.printdata = wepos.hooks.applyFilters( 'wepos_after_payment_print_data', {
+                        line_items: this.cartdata.line_items,
+                        fee_lines: this.cartdata.fee_lines,
+                        subtotal: this.$store.getters['Cart/getSubtotal'],
+                        taxtotal: this.$store.getters['Cart/getTotalTax'],
+                        ordertotal: this.$store.getters['Cart/getTotal'],
+                        gateway: {
+                            id: orderResponse.payment_method,
+                            title: orderResponse.payment_method_title
+                        },
+                        order_id: orderResponse.id,
+                        order_date: orderResponse.date_created,
+                        cashamount: this.cashAmount.toString(),
+                        changeamount: this.changeAmount.toString(),
+                        customer_id: this.orderdata.customer_id ? this.orderdata.customer_id : null,
+                        billing: this.orderdata.billing ? this.orderdata.billing : null,
+                        points: pointsResponse ? pointsResponse.earned : null,
+                        points_balance: pointsResponse ? pointsResponse.points_balance : null
+                    }, orderdata );
+
                     $contentWrap.unblock();
-                    alert( data.responseJSON.message );
-                });
-            }).fail( response => {
+                } else {
+                    $contentWrap.unblock();
+                }
+            } catch (error) {
+                const message = error.responseJSON ? error.responseJSON.message : 'Error';
                 $contentWrap.unblock();
-                alert( response.responseJSON.message );
+                alert( message );
+            }
+        },
+
+        sendWa( data ) {
+            let text = `https://wa.me/${this.orderdata.billing.phone}?text=`;
+            text += `%2A${this.settings.wepos_receipts.receipt_header}%2A%0A%0A`;
+
+            text += `%2A${this.__( 'Nomor Order', 'wepos' )}: ${data.order_id}%2A%0A`;
+            text += `%2A${this.__( 'Tanggal', 'wepos' )}: ${data.order_date}%2A%0A%0A`;
+
+            if ( data.customer_id ) {
+                text += `%2A${this.__( 'Nama Customer', 'wepos' )}: ${data.billing.first_name}%2A%0A`;
+                text += `%2A${this.__( 'ID Customer', 'wepos' )}: ${data.billing.first_name} ${data.billing.last_name}%2A%0A%0A`;
+            }
+
+            weLo_.forEach( data.line_items, item => {
+                let price = item.regular_price;
+                if ( item.on_sale ) {
+                    price = item.sale_price;
+                }
+                text += `%2A${item.name}%2A: ${item.quantity}x ${this.formatPrice(price)}%0A`;
+                if ( item.measurement_needed_total ) {
+                    text += '_';
+                    weLo_.forIn(this.getMeasurementData( item ), meta => {
+                        text += `${meta.label} (${meta.unit}): ${meta.value}, `;
+                    } );
+                    text += `Total (${item.measurement_needed_unit}): ${item.measurement_needed_total}_`;
+                }
             } );
+
+            text += `%0A%0A%2A${this.__( 'Subtotal', 'wepos' )}%2A: ${this.formatPrice( data.subtotal )}%0A`;
+            text += `%2A${this.__( 'Total', 'wepos' )}%2A: ${this.formatPrice( data.ordertotal )}%0A`;
+            text += `%2A${this.__( 'Pembayaran', 'wepos' )}%2A: ${data.gateway.title}%0A`;
+            text += `%2A${this.__( 'Total Dibayar', 'wepos' )}%2A: ${this.formatPrice( data.cashamount )}%0A`;
+            text += `%2A${this.__( 'Kembalian', 'wepos' )}%2A: ${this.formatPrice( data.changeamount )}%0A%0A`;
+
+            if ( data.points ) {
+                text += `%2APoint Diperoleh%2A: ${data.points}%0A`;
+                text += `%2ATotal Point Anda%2A: ${data.points_balance}%0A`;
+            }
+
+            text += `%0A%0A${wepos.current_user_display_name}%0A`;
+            text += wepos.site_name + '%0A';
+            text += this.settings.wepos_receipts.receipt_footer;
+
+            window.open(text.replace(/(<([^>]+)>)/gi, '%0A'), '_blank');
+        },
+
+        getMeasurementData( cartItem ) {
+            let result = {};
+
+            weLo_.forIn( cartItem, ( item, key ) => {
+                if (
+                    key.includes('measurement_needed_') &&
+                    ! ['measurement_needed_total', 'measurement_needed_unit'].includes(key)
+                ) {
+                    Object.assign( result, { [key]: item } );
+                }
+            } );
+
+            return result;
         },
 
         initPayment() {
@@ -1108,7 +1214,6 @@ export default {
                 this.taxSettings = response;
             });
         },
-
         focusCashInput() {
             let inputCashAmount = document.querySelector('#input-cash-amount');
             inputCashAmount.focus();
@@ -2164,7 +2269,8 @@ export default {
                                 }
                             }
 
-                            &.update-quantity-wrap {
+                            &.update-quantity-wrap,
+                            &.measurement-calculator-wrap {
                                 td {
                                     padding: 10px;
                                     background: #F6F7FB;

@@ -198,6 +198,17 @@ function wepos_get_settings_fields() {
                     'custom' => __( 'Custom field', 'wepos' ),
                 ]
             ],
+            'whatsapp_support' => [
+                'name'    => 'whatsapp_support',
+                'label'   => __( 'Enable WA', 'wepos' ),
+                'desc'    => __( 'Whatsapp Support', 'wepos' ),
+                'type'    => 'select',
+                'default' => 'yes',
+                'options' => [
+                    'yes' => __( 'Yes', 'wepos' ),
+                    'no'  => __( 'No', 'wepos' ),
+                ]
+            ]
         ],
         'wepos_receipts' => [
             'receipt_header' => [
