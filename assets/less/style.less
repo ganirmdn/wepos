@@ -83,6 +83,13 @@ body {
     }
 }
 
+.wepos-text-alert {
+    font-size: 12px;
+    &.alert-danger {
+        color: #721c24;
+    }
+}
+
 .spinner.spinner-loading {
 
     @keyframes scale-2 {
@@ -584,6 +591,9 @@ body {
         }
     }
     .print-section {
+        display: flex;
+        align-items: center;
+        justify-content: center;
         padding-top: 15px;
 
         button {
@@ -602,7 +612,10 @@ body {
                 background: #F2683E;
                 border: 1px solid #F2683E;
             }
-
+            &.send-wa {
+                background: #77c777;
+                border: 1px solid #77c777;
+            }
             span.icon {
                 &:before {
                     font-size: 15px;
